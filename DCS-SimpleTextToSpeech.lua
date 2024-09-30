@@ -134,34 +134,40 @@ function STTS.TextToSpeech(message,freqs,modulations, volume,name, coalition,poi
 	culture = culture or ""
 	voice = voice or ""
 
-
     message = message:gsub("\"","\\\"")
     
-    local cmd = string.format("start /min \"\" /d \"%s\" /b \"%s\" -f %s -m %s -c %s -p %s -n \"%s\" -h", STTS.DIRECTORY, STTS.EXECUTABLE, freqs, modulations, coalition,STTS.SRS_PORT, name )
-    
-    if voice ~= "" then
-    	cmd = cmd .. string.format(" -V \"%s\"",voice)
-    else
+    local pwsh = string.format("Start-Process -WindowStyle Hidden -WorkingDirectory \"%s\" -FilePath \"%s\"", STTS.DIRECTORY, STTS.EXECUTABLE, freqs, modulations, coalition,STTS.SRS_PORT, name )
 
+    local cmdArgs = {
+        ["-f"] = freqs,
+        ["-m"] = modulations,
+        ["-c"] = coalition,
+        ["-p"] = STTS.SRS_PORT,
+        ["-n"] = name
+    }
+
+    if voice ~= "" then
+        cmdArgs["-V"] = voice
+    else
     	if culture ~= "" then
-    		cmd = cmd .. string.format(" -l %s",culture)
+            cmdArgs["-l"] = culture
     	end
 
     	if gender ~= "" then
-    		cmd = cmd .. string.format(" -g %s",gender)
+            cmdArgs["-g"] = gender
     	end
     end
 
     if googleTTS == true then
-        cmd = cmd .. string.format(" -G \"%s\"",STTS.GOOGLE_CREDENTIALS)
+        cmdArgs["-G"] = STTS.GOOGLE_CREDENTIALS
     end
 
     if speed ~= 1 then
-        cmd = cmd .. string.format(" -s %s",speed)
+        cmdArgs["-s"] = speed
     end
 
     if volume ~= 1.0 then
-        cmd = cmd .. string.format(" -v %s",volume)
+        cmdArgs["-v"] = volume
     end
 
     if point and type(point) == "table" and point.x then
@@ -171,25 +177,35 @@ function STTS.TextToSpeech(message,freqs,modulations, volume,name, coalition,poi
         lon = STTS.round(lon,4)
         alt = math.floor(alt)
 
-        cmd = cmd .. string.format(" -L %s -O %s -A %s",lat,lon,alt)        
+        cmdArgs["-L"] = lat
+        cmdArgs["-O"] = lon
+        cmdArgs["-A"] = alt
     end
 
-    cmd = cmd ..string.format(" -t \"%s\"",message)
+    cmdArgs["-t"] = message
 
-    if string.len(cmd) > 255 then
-        local filename = os.getenv('TMP') .. "\\DCS_STTS-" .. STTS.uuid() .. ".bat"
+    local cmdArgsList = {}
+    for k,v in pairs(cmdArgs) do
+        if type(v) == "string" then
+            v = '"'..v..'"'
+        end
+        table.insert(cmdArgsList,"'"..k.." "..v.."'")
+    end
+    pwsh = pwsh .. " -ArgumentList " .. table.concat(cmdArgsList,',')
+
+    if string.len(pwsh) > 1 then
+        local filename = lfs.tempdir() .. "\\DCS_STTS-" .. STTS.uuid() .. ".ps1"
         local script = io.open(filename,"w+")
-        script:write(cmd .. " && exit" )
+        script:write(pwsh)
         script:close()
-        cmd = string.format("\"%s\"",filename)
+        pwsh = string.format('powershell.exe  -ExecutionPolicy Unrestricted -WindowStyle Hidden -Command "%s"',filename)
         timer.scheduleFunction(os.remove, filename, timer.getTime() + 1) 
     end
-
-    if string.len(cmd) > 255 then
-         env.info("[DCS-STTS] - cmd string too long")
-         env.info("[DCS-STTS] TextToSpeech Command :\n" .. cmd.."\n")
-    end
-    os.execute(cmd)
+    if string.len(pwsh) > 255 then
+        env.info("[DCS-STTS] - pwsh string too long")
+        env.info("[DCS-STTS] TextToSpeech Command :\n" .. pwsh.."\n")
+   end
+    os.execute(pwsh)
 
     return STTS.getSpeechTime(message,speed,googleTTS)
 
@@ -206,7 +222,7 @@ function STTS.PlayMP3(pathToMP3,freqs,modulations, volume,name, coalition,point 
         lon = STTS.round(lon,4)
         alt = math.floor(alt)
 
-        cmd = cmd .. string.format(" -L %s -O %s -A %s",lat,lon,alt)        
+        cmd = cmd .. string.format(" -L %s -O %s -A %s",lat,lon,alt)
     end
 
     env.info("[DCS-STTS] MP3/OGG Command :\n" .. cmd.."\n")
