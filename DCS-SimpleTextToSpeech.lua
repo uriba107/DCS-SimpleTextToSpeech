@@ -88,7 +88,7 @@ function STTS.round(x, n)
     return x / n
 end
 
-function STTS.getSpeechTime(length,speed,isGoogle)
+function STTS.getSpeechTime(length,speed,googleTTS)
     -- Function returns estimated speech time in seconds
 
     -- Assumptions for time calc: 100 Words per min, avarage of 5 letters for english word
@@ -99,10 +99,10 @@ function STTS.getSpeechTime(length,speed,isGoogle)
     local maxRateRatio = 3 
 
     speed = speed or 1.0
-    isGoogle = isGoogle or false
+    googleTTS = googleTTS or false
 
     local speedFactor = 1.0
-    if isGoogle then
+    if googleTTS then
         speedFactor = speed
     else
         if speed ~= 0 then
@@ -136,7 +136,7 @@ function STTS.TextToSpeech(message,freqs,modulations, volume,name, coalition,poi
 
     message = message:gsub("\"","\\\"")
     
-    local pwsh = string.format("Start-Process -WindowStyle Hidden -WorkingDirectory \"%s\" -FilePath \"%s\"", STTS.DIRECTORY, STTS.EXECUTABLE, freqs, modulations, coalition,STTS.SRS_PORT, name )
+    local pwsh = string.format("Start-Process -WindowStyle Hidden -WorkingDirectory \"%s\" -FilePath \"%s\"", STTS.DIRECTORY, STTS.EXECUTABLE )
 
     local cmdArgs = {
         ["-f"] = freqs,
@@ -192,7 +192,6 @@ function STTS.TextToSpeech(message,freqs,modulations, volume,name, coalition,poi
         table.insert(cmdArgsList,"'"..k.." "..v.."'")
     end
     pwsh = pwsh .. " -ArgumentList " .. table.concat(cmdArgsList,',')
-
     if string.len(pwsh) > 1 then
         local filename = lfs.tempdir() .. "\\DCS_STTS-" .. STTS.uuid() .. ".ps1"
         local script = io.open(filename,"w+")
@@ -211,7 +210,7 @@ function STTS.TextToSpeech(message,freqs,modulations, volume,name, coalition,poi
 
 end
 
-function STTS.PlayMP3(pathToMP3,freqs,modulations, volume,name, coalition,point )
+    function STTS.PlayMP3(pathToMP3,freqs,modulations, volume,name, coalition,point )
 
     local cmd = string.format("start \"\" /d \"%s\" /b /min \"%s\" -i \"%s\" -f %s -m %s -c %s -p %s -n \"%s\" -v %s -h", STTS.DIRECTORY, STTS.EXECUTABLE, pathToMP3, freqs, modulations, coalition,STTS.SRS_PORT, name, volume )
     
